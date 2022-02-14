@@ -12,3 +12,5 @@ packaged.y?ml
 template.y?ml
 testEvent.json
 requirements.txt
+*.lock
+*.toml

@@ -1,0 +1,18 @@
+proto_outdir = "./model"
+
+[[dependencies]]
+  target = "github.com/coralogix/xc-api-xdr-ingestion/"
+  subgroup = ""
+  revision = "33b5ea1671dbb14a02ae58a5b1334ae36960be63"
+  branch = "feature/xdr-ingestion"
+  path = ""
+  protocol = "ssh"
+
+[[dependencies]]
+  target = "github.com/googleapis/googleapis"
+  subgroup = ""
+  revision = "23d18b4f004e4b5f06b33459d701d9291674c2cf"
+  branch = "master"
+  path = ""
+  includes = ["/google/api/http.proto", "/google/api/annotations.proto"]
+  protocol = ""

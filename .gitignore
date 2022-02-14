@@ -8,3 +8,4 @@ coverage/
 package-lock.json
 .aws-sam/
 packaged.y?ml
+*.proto
