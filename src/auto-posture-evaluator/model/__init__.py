@@ -3,11 +3,9 @@
 # plugin: python-betterproto
 from dataclasses import dataclass
 from datetime import datetime
-from typing import Dict, List, Optional
+from typing import List, Optional
 
 import betterproto
-from betterproto.grpc.grpclib_server import ServiceBase
-import grpclib
 
 
 class SecurityReportTestResultResult(betterproto.Enum):
@@ -61,6 +59,7 @@ class SecurityReportTestResult(betterproto.Message):
     additional_data: Optional[
         "betterproto_lib_google_protobuf.Struct"
     ] = betterproto.message_field(9, optional=True, group="_additional_data")
+    account: Optional[str] = betterproto.message_field(10, wraps=betterproto.TYPE_STRING)
 
 
 @dataclass(eq=False, repr=False)
@@ -75,45 +74,17 @@ class PostSecurityReportResponse(betterproto.Message):
 
 class SecurityReportIngestionServiceStub(betterproto.ServiceStub):
     async def post_security_report(
-        self, *, security_report: "SecurityReport" = None
+            self, *, api_key: str, security_report: "SecurityReport" = None
     ) -> "PostSecurityReportResponse":
-
         request = PostSecurityReportRequest()
         if security_report is not None:
             request.security_report = security_report
-
         return await self._unary_unary(
-            "/com.coralogix.xdr.ingestion.v1.SecurityReportIngestionService/PostSecurityReport",
-            request,
-            PostSecurityReportResponse,
+            route="/com.coralogix.xdr.ingestion.v1.SecurityReportIngestionService/PostSecurityReport",
+            request=request,
+            response_type=PostSecurityReportResponse,
+            metadata=[('authorization', api_key)]
         )
-
-
-class SecurityReportIngestionServiceBase(ServiceBase):
-    async def post_security_report(
-        self, security_report: "SecurityReport"
-    ) -> "PostSecurityReportResponse":
-        raise grpclib.GRPCError(grpclib.const.Status.UNIMPLEMENTED)
-
-    async def __rpc_post_security_report(self, stream: grpclib.server.Stream) -> None:
-        request = await stream.recv_message()
-
-        request_kwargs = {
-            "security_report": request.security_report,
-        }
-
-        response = await self.post_security_report(**request_kwargs)
-        await stream.send_message(response)
-
-    def __mapping__(self) -> Dict[str, grpclib.const.Handler]:
-        return {
-            "/com.coralogix.xdr.ingestion.v1.SecurityReportIngestionService/PostSecurityReport": grpclib.const.Handler(
-                self.__rpc_post_security_report,
-                grpclib.const.Cardinality.UNARY_UNARY,
-                PostSecurityReportRequest,
-                PostSecurityReportResponse,
-            ),
-        }
 
 
 import betterproto.lib.google.protobuf as betterproto_lib_google_protobuf
