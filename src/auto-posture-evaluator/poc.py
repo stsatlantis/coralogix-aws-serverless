@@ -27,7 +27,9 @@ class TestReport(ABC):
                  start_time: datetime,
                  end_time: datetime,
                  item: str,
-                 item_type: str, passed: bool, **kwargs):
+                 item_type: str,
+                 passed: bool,
+                 **kwargs):
         self.provider = provider
         self.service = service
         self.account = account
@@ -72,8 +74,12 @@ def _to_model(report: TestReport) -> "SecurityReportTestResult":
 
 class AutoPostureEvaluatorRunnable:
     def __init__(self):
-        self.channel = Channel(host="localhost", port=9090)
+        endpoint = os.environ.get("CORALOGIX_ENDPOINT_HOST")  # eg.: api.coralogix.net
+        port = os.environ.get("CORALOGIX_ENDPOINT_PORT", "443")
+
+        self.channel = Channel(host=endpoint, port=int(port), ssl=True)
         self.client = SecurityReportIngestionServiceStub(channel=self.channel)
+        self.api_key = os.environ.get('API_KEY')
         self.private_key = os.environ.get('PRIVATE_KEY')
         self.context = SecurityReportContext(
             private_key=self.private_key,
@@ -99,14 +105,19 @@ class AutoPostureEvaluatorRunnable:
 
             error_template = "The result object from the tester " + cur_tester.declare_tested_service() + " does not match the required standard"
             if results is None:
+                self.channel.close()
                 raise Exception(error_template + " (ResultIsNone). CANNOT CONTINUE.")
             if not isinstance(results, list):
+                self.channel.close()
                 raise Exception(error_template + " (NotArray). CANNOT CONTINUE.")
             else:
                 results = list(map(_to_model, results))
                 report = SecurityReport(context=self.context, test_results=results)
-                await self.client.post_security_report(api_key=self.private_key, security_report=report)
-        self.channel.close()
+                try:
+                    print("Sending requests", len(results))
+                    await self.client.post_security_report(api_key=self.api_key, security_report=report)
+                finally:
+                    self.channel.close()
         pass
 
 
