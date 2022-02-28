@@ -8,7 +8,7 @@ import botocore.exceptions
 import requests
 import urllib.parse
 
-from poc import TesterInterface, TestReport
+from poc_interface import TesterInterface, TestReport
 
 
 class Tester(TesterInterface):

@@ -4,7 +4,7 @@ from typing import List
 
 import requests
 
-from poc import TesterInterface, TestReport
+from poc_interface import TesterInterface, TestReport
 
 
 class Tester(TesterInterface):

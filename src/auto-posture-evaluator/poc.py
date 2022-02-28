@@ -2,9 +2,7 @@ import asyncio
 import importlib
 import os
 import sys
-from abc import ABC
 from asyncio import AbstractEventLoop
-from datetime import datetime
 from typing import List
 
 from grpclib.client import Channel
@@ -12,45 +10,12 @@ from grpclib.client import Channel
 from model import SecurityReportTestResult, SecurityReportIngestionServiceStub, SecurityReportContext, SecurityReport, \
     SecurityReportTestResultResult
 from model.helper import struct_from_dict
+from poc_interface import TestReport, TesterInterface
 
-testers_module_names = ['testers.example_tester']
+testers_module_names = ['testers.example_tester', 'testers.s3_tester', 'testers.rds_tester']
 for module in testers_module_names:
     importlib.import_module(module)
 del module
-
-
-class TestReport(ABC):
-    def __init__(self, provider: str,
-                 service: str,
-                 account: str,
-                 name: str,
-                 start_time: datetime,
-                 end_time: datetime,
-                 item: str,
-                 item_type: str,
-                 passed: bool,
-                 **kwargs):
-        self.provider = provider
-        self.service = service
-        self.account = account
-        self.name = name
-        self.start_time = start_time
-        self.end_time = end_time
-        self.item = item
-        self.item_type = item_type
-        self.passed = passed
-        self.additional_data = kwargs
-
-
-class TesterInterface:
-    def declare_tested_service(self) -> str:
-        pass
-
-    def declare_tested_provider(self) -> str:
-        pass
-
-    def run_tests(self) -> List["TestReport"]:
-        pass
 
 
 def _to_model(report: TestReport) -> "SecurityReportTestResult":
