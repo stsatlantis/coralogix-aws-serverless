@@ -1,13 +1,17 @@
+import datetime
 import json
-import time
+from datetime import datetime
+from typing import List
+
 import boto3
 import botocore.exceptions
-import interfaces
 import requests
 import urllib.parse
 
+from poc import TesterInterface, TestReport
 
-class Tester(interfaces.TesterInterface):
+
+class Tester(TesterInterface):
     def __init__(self):
         self.aws_s3_client = boto3.client('s3')
         self.aws_s3_resource = boto3.resource('s3')
@@ -16,6 +20,7 @@ class Tester(interfaces.TesterInterface):
         self.account_arn = boto3.client('sts').get_caller_identity().get('Arn')
         self.account_id = boto3.client('sts').get_caller_identity().get('Account')
         self.s3_buckets = boto3.client('s3').list_buckets()
+        self.start_time = None
 
     def declare_tested_service(self) -> str:
         return 's3'
@@ -23,7 +28,8 @@ class Tester(interfaces.TesterInterface):
     def declare_tested_provider(self) -> str:
         return 'aws'
 
-    def run_tests(self) -> list:
+    def run_tests(self) -> List["TestReport"]:
+        self.start_time = datetime.now()
         return \
             self.detect_write_enabled_buckets(self.s3_buckets) + \
             self.detect_publicly_accessible_s3_buckets_by_acl(self.s3_buckets) + \
@@ -41,10 +47,10 @@ class Tester(interfaces.TesterInterface):
             self.detect_buckets_accessible_by_http_url(self.s3_buckets) + \
             self.detect_buckets_accessible_by_https_url(self.s3_buckets)
 
-    def detect_write_enabled_buckets(self, buckets_list):
+    def detect_write_enabled_buckets(self, buckets_list) -> List["TestReport"]:
         return self._detect_buckets_with_permissions_matching(buckets_list, "WRITE", "write_enabled_s3_buckets")
 
-    def detect_publicly_accessible_s3_buckets_by_acl(self, buckets_list):
+    def detect_publicly_accessible_s3_buckets_by_acl(self, buckets_list) -> List["TestReport"]:
         test_name = "publicly_accessible_s3_buckets_by_acl"
         result = []
         for bucket_meta in buckets_list["Buckets"]:
@@ -55,62 +61,81 @@ class Tester(interfaces.TesterInterface):
                 if grantee["Grantee"]["Type"] == "Group" and (
                         grantee["Grantee"]["URI"] == "http://acs.amazonaws.com/groups/global/AllUsers" or
                         grantee["Grantee"]["URI"] == "http://acs.amazonaws.com/groups/global/AuthenticatedUsers"):
-                    result.append({
-                        "user": self.user_id,
-                        "account_arn": self.account_arn,
-                        "account": self.account_id,
-                        "timestamp": time.time(),
-                        "item": bucket_name,
-                        "item_type": "s3_bucket",
-                        "test_name": test_name,
-                        "permissions": cur_bucket_permissions.grants,
-                        "test_result": "issue_found"
-                    })
+
+                    report = TestReport(
+                        provider=self.declare_tested_provider(),
+                        service=self.declare_tested_service(),
+                        account=self.account_id,
+                        name=test_name,
+                        start_time=self.start_time,
+                        end_time=datetime.now(),
+                        item=bucket_name,
+                        item_type="s3_bucket",
+                        passed=False,
+                        user=self.user_id,
+                        account_arn=self.account_arn,
+                        permissions=cur_bucket_permissions.grants
+                    )
+                    result.append(report)
                     issue_detected = True
             if not issue_detected:
-                result.append({
-                    "user": self.user_id,
-                    "account_arn": self.account_arn,
-                    "account": self.account_id,
-                    "timestamp": time.time(),
-                    "item": bucket_name,
-                    "item_type": "s3_bucket",
-                    "test_name": test_name,
-                    "test_result": "no_issue_found"})
+                report = TestReport(
+                    provider=self.declare_tested_provider(),
+                    service=self.declare_tested_service(),
+                    account=self.account_id,
+                    name=test_name,
+                    start_time=self.start_time,
+                    end_time=datetime.now(),
+                    item=bucket_name,
+                    item_type="s3_bucket",
+                    passed=True,
+                    user=self.user_id,
+                    account_arn=self.account_arn
+                )
+                result.append(report)
 
         return result
 
-    def detect_non_versioned_s3_buckets(self, buckets_list):
+    def detect_non_versioned_s3_buckets(self, buckets_list) -> List["TestReport"]:
         test_name = "non_versioned_s3_buckets"
         result = []
         for bucket_meta in buckets_list["Buckets"]:
             bucket_name = bucket_meta["Name"]
             cur_bucket_versioning = self._get_bucket_versioning(bucket_name)
             if not cur_bucket_versioning.status:
-                result.append({
-                    "user": self.user_id,
-                    "account_arn": self.account_arn,
-                    "account": self.account_id,
-                    "timestamp": time.time(),
-                    "item": bucket_name,
-                    "item_type": "s3_bucket",
-                    "test_name": test_name,
-                    "test_result": "issue_found"
-                })
+                report = TestReport(
+                    provider=self.declare_tested_provider(),
+                    service=self.declare_tested_service(),
+                    account=self.account_id,
+                    name=test_name,
+                    start_time=self.start_time,
+                    end_time=datetime.now(),
+                    item=bucket_name,
+                    item_type="s3_bucket",
+                    passed=False,
+                    user=self.user_id,
+                    account_arn=self.account_arn
+                )
+                result.append(report)
             else:
-                result.append({
-                    "user": self.user_id,
-                    "account_arn": self.account_arn,
-                    "account": self.account_id,
-                    "timestamp": time.time(),
-                    "item": bucket_name,
-                    "item_type": "s3_bucket",
-                    "test_name": test_name,
-                    "test_result": "no_issue_found"})
+                report = TestReport(
+                    provider=self.declare_tested_provider(),
+                    service=self.declare_tested_service(),
+                    account=self.account_id,
+                    name=test_name,
+                    start_time=self.start_time,
+                    end_time=datetime.now(),
+                    item=bucket_name,
+                    item_type="s3_bucket",
+                    passed=True,
+                    user=self.user_id,
+                    account_arn=self.account_arn
+                )
+                result.append(report)
 
         return result
 
-    def detect_not_encrypted_s3_buckets(self, buckets_list):
+    def detect_not_encrypted_s3_buckets(self, buckets_list) -> List["TestReport"]:
         test_name = "not_encrypted_s3_buckets"
         result = []
         for bucket_meta in buckets_list["Buckets"]:
@@ -120,67 +145,85 @@ class Tester(interfaces.TesterInterface):
                 self.aws_s3_client.get_bucket_encryption(Bucket=bucket_name)
             except botocore.exceptions.ClientError as ex:
                 if ex.response['Error']['Code'] == 'ServerSideEncryptionConfigurationNotFoundError':
-                    result.append({
-                        "user": self.user_id,
-                        "account_arn": self.account_arn,
-                        "account": self.account_id,
-                        "timestamp": time.time(),
-                        "item": bucket_name,
-                        "item_type": "s3_bucket",
-                        "test_name": test_name,
-                        "test_result": "issue_found"
-                    })
+                    report = TestReport(
+                        provider=self.declare_tested_provider(),
+                        service=self.declare_tested_service(),
+                        account=self.account_id,
+                        name=test_name,
+                        start_time=self.start_time,
+                        end_time=datetime.now(),
+                        item=bucket_name,
+                        item_type="s3_bucket",
+                        passed=False,
+                        user=self.user_id,
+                        account_arn=self.account_arn
+                    )
+                    result.append(report)
                     issue_detected = True
                 else:
                     raise ex
 
             if not issue_detected:
-                result.append({
-                    "user": self.user_id,
-                    "account_arn": self.account_arn,
-                    "account": self.account_id,
-                    "timestamp": time.time(),
-                    "item": bucket_name,
-                    "item_type": "s3_bucket",
-                    "test_name": test_name,
-                    "test_result": "no_issue_found"})
+                report = TestReport(
+                    provider=self.declare_tested_provider(),
+                    service=self.declare_tested_service(),
+                    account=self.account_id,
+                    name=test_name,
+                    start_time=self.start_time,
+                    end_time=datetime.now(),
+                    item=bucket_name,
+                    item_type="s3_bucket",
+                    passed=True,
+                    user=self.user_id,
+                    account_arn=self.account_arn
+                )
+                result.append(report)
 
         return result
 
-    def detect_full_control_allowed_s3_buckets(self, buckets_list):
+    def detect_full_control_allowed_s3_buckets(self, buckets_list) -> List["TestReport"]:
         return self._detect_buckets_with_permissions_matching(buckets_list, "FULL_CONTROL", "full_control_allowed_s3_buckets")
 
-    def detect_buckets_without_mfa_delete_s3_buckets(self, buckets_list):
+    def detect_buckets_without_mfa_delete_s3_buckets(self, buckets_list) -> List["TestReport"]:
         test_name = "no_delete_mfa_s3_buckets"
         result = []
         for bucket_meta in buckets_list["Buckets"]:
             bucket_name = bucket_meta["Name"]
             cur_bucket_versioning = self._get_bucket_versioning(bucket_name)
             if not cur_bucket_versioning.mfa_delete:
-                result.append({
-                    "user": self.user_id,
-                    "account_arn": self.account_arn,
-                    "account": self.account_id,
-                    "timestamp": time.time(),
-                    "item": bucket_name,
-                    "item_type": "s3_bucket",
-                    "test_name": test_name,
-                    "test_result": "issue_found"
-                })
+                report = TestReport(
+                    provider=self.declare_tested_provider(),
+                    service=self.declare_tested_service(),
+                    account=self.account_id,
+                    name=test_name,
+                    start_time=self.start_time,
+                    end_time=datetime.now(),
+                    item=bucket_name,
+                    item_type="s3_bucket",
+                    passed=False,
+                    user=self.user_id,
+                    account_arn=self.account_arn
+                )
+                result.append(report)
             else:
-                result.append({
-                    "user": self.user_id,
-                    "account_arn": self.account_arn,
-                    "account": self.account_id,
-                    "timestamp": time.time(),
-                    "item": bucket_name,
-                    "item_type": "s3_bucket",
-                    "test_name": test_name,
-                    "test_result": "no_issue_found"})
+                report = TestReport(
+                    provider=self.declare_tested_provider(),
+                    service=self.declare_tested_service(),
+                    account=self.account_id,
+                    name=test_name,
+                    start_time=self.start_time,
+                    end_time=datetime.now(),
+                    item=bucket_name,
+                    item_type="s3_bucket",
+                    passed=True,
+                    user=self.user_id,
+                    account_arn=self.account_arn
+                )
+                result.append(report)
 
         return result
 
-    def detect_buckets_without_block_public_access_set(self, buckets_list):
+    def detect_buckets_without_block_public_access_set(self, buckets_list) -> List["TestReport"]:
         test_name = "no_block_public_access_set"
         result = []
         for bucket_meta in buckets_list["Buckets"]:
@@ -188,53 +231,67 @@ class Tester(interfaces.TesterInterface):
             bucket_name = bucket_meta["Name"]
             try:
                 public_access_block_kill_switch = self.aws_s3_client.get_public_access_block(Bucket=bucket_name)
-                if not public_access_block_kill_switch["PublicAccessBlockConfiguration"]["BlockPublicAcls"] or \
-                    not public_access_block_kill_switch["PublicAccessBlockConfiguration"]["IgnorePublicAcls"] or \
-                    not public_access_block_kill_switch["PublicAccessBlockConfiguration"]["BlockPublicPolicy"] or \
-                    not public_access_block_kill_switch["PublicAccessBlockConfiguration"]["RestrictPublicBuckets"]:
-                    result.append({
-                        "user": self.user_id,
-                        "account_arn": self.account_arn,
-                        "account": self.account_id,
-                        "timestamp": time.time(),
-                        "item": bucket_name,
-                        "item_type": "s3_bucket",
-                        "test_name": test_name,
-                        "public_access_block": public_access_block_kill_switch["PublicAccessBlockConfiguration"],
-                        "test_result": "issue_found"
-                    })
+                access_block = public_access_block_kill_switch["PublicAccessBlockConfiguration"]
+                if not access_block["BlockPublicAcls"] or \
+                    not access_block["IgnorePublicAcls"] or \
+                    not access_block["BlockPublicPolicy"] or \
+                    not access_block["RestrictPublicBuckets"]:
+                    report = TestReport(
+                        provider=self.declare_tested_provider(),
+                        service=self.declare_tested_service(),
+                        account=self.account_id,
+                        name=test_name,
+                        start_time=self.start_time,
+                        end_time=datetime.now(),
+                        item=bucket_name,
+                        item_type="s3_bucket",
+                        passed=False,
+                        user=self.user_id,
+                        account_arn=self.account_arn,
+                        public_access_block=access_block
+                    )
+                    result.append(report)
                     issue_detected = True
             except botocore.exceptions.ClientError as ex:
                 if ex.response['Error']['Code'] == 'NoSuchPublicAccessBlockConfiguration':
-                    result.append({
-                        "user": self.user_id,
-                        "account_arn": self.account_arn,
-                        "account": self.account_id,
-                        "timestamp": time.time(),
-                        "item": bucket_name,
-                        "item_type": "s3_bucket",
-                        "test_name": test_name,
-                        "public_access_block": {},
-                        "test_result": "issue_found"
-                    })
+                    report = TestReport(
+                        provider=self.declare_tested_provider(),
+                        service=self.declare_tested_service(),
+                        account=self.account_id,
+                        name=test_name,
+                        start_time=self.start_time,
+                        end_time=datetime.now(),
+                        item=bucket_name,
+                        item_type="s3_bucket",
+                        passed=False,
+                        user=self.user_id,
+                        account_arn=self.account_arn,
+                        public_access_block={}
+                    )
+                    result.append(report)
                     issue_detected = True
                 else:
                     raise ex
 
             if not issue_detected:
-                result.append({
-                    "user": self.user_id,
-                    "account_arn": self.account_arn,
-                    "account": self.account_id,
-                    "timestamp": time.time(),
-                    "item": bucket_name,
-                    "item_type": "s3_bucket",
-                    "test_name": test_name,
-                    "test_result": "no_issue_found"})
+                report = TestReport(
+                    provider=self.declare_tested_provider(),
+                    service=self.declare_tested_service(),
+                    account=self.account_id,
+                    name=test_name,
+                    start_time=self.start_time,
+                    end_time=datetime.now(),
+                    item=bucket_name,
+                    item_type="s3_bucket",
+                    passed=True,
+                    user=self.user_id,
+                    account_arn=self.account_arn
+                )
+                result.append(report)
 
         return result
 
-    def detect_publicly_accessible_s3_buckets_by_policy(self, buckets_list):
+    def detect_publicly_accessible_s3_buckets_by_policy(self, buckets_list) -> List["TestReport"]:
         test_name = "publicly_accessible_s3_buckets_by_policy"
         result = []
         for bucket_meta in buckets_list["Buckets"]:
@@ -244,17 +301,21 @@ class Tester(interfaces.TesterInterface):
                 bucket_policy_status = self.aws_s3_client.get_bucket_policy_status(Bucket=bucket_name)
                 if bucket_policy_status["PolicyStatus"]["IsPublic"]:
                     bucket_policy = self._get_bucket_policy(bucket_name)["Policy"]
-                    result.append({
-                        "user": self.user_id,
-                        "account_arn": self.account_arn,
-                        "account": self.account_id,
-                        "timestamp": time.time(),
-                        "item": bucket_name,
-                        "item_type": "s3_bucket",
-                        "test_name": test_name,
-                        "policy": bucket_policy,
-                        "test_result": "issue_found"
-                    })
+                    report = TestReport(
+                        provider=self.declare_tested_provider(),
+                        service=self.declare_tested_service(),
+                        account=self.account_id,
+                        name=test_name,
+                        start_time=self.start_time,
+                        end_time=datetime.now(),
+                        item=bucket_name,
+                        item_type="s3_bucket",
+                        passed=False,
+                        user=self.user_id,
+                        account_arn=self.account_arn,
+                        policy=bucket_policy
+                    )
+                    result.append(report)
                     issue_detected = True
             except botocore.exceptions.ClientError as ex:
                 if ex.response['Error']['Code'] == 'NoSuchBucketPolicy':
@@ -264,19 +325,24 @@ class Tester(interfaces.TesterInterface):
                     raise ex
 
             if not issue_detected:
-                result.append({
-                    "user": self.user_id,
-                    "account_arn": self.account_arn,
-                    "account": self.account_id,
-                    "timestamp": time.time(),
-                    "item": bucket_name,
-                    "item_type": "s3_bucket",
-                    "test_name": test_name,
-                    "test_result": "no_issue_found"})
+                report = TestReport(
+                    provider=self.declare_tested_provider(),
+                    service=self.declare_tested_service(),
+                    account=self.account_id,
+                    name=test_name,
+                    start_time=self.start_time,
+                    end_time=datetime.now(),
+                    item=bucket_name,
+                    item_type="s3_bucket",
+                    passed=True,
+                    user=self.user_id,
+                    account_arn=self.account_arn
+                )
+                result.append(report)
 
         return result
 
-    def detect_bucket_content_listable_by_users(self, buckets_list):
+    def detect_bucket_content_listable_by_users(self, buckets_list) -> List["TestReport"]:
         test_name = "s3_bucket_content_listable_by_users"
         result = []
         for bucket_meta in buckets_list["Buckets"]:
@@ -287,17 +353,21 @@ class Tester(interfaces.TesterInterface):
                 policy_statements = json.loads(bucket_policy['Policy'])['Statement']
                 for statement in policy_statements:
                     if str(statement["Resource"]).endswith('*'):
-                        result.append({
-                            "user": self.user_id,
-                            "account_arn": self.account_arn,
-                            "account": self.account_id,
-                            "timestamp": time.time(),
-                            "item": bucket_name,
-                            "item_type": "s3_bucket",
-                            "test_name": test_name,
-                            "policy": bucket_policy,
-                            "test_result": "issue_found"
-                        })
+                        report = TestReport(
+                            provider=self.declare_tested_provider(),
+                            service=self.declare_tested_service(),
+                            account=self.account_id,
+                            name=test_name,
+                            start_time=self.start_time,
+                            end_time=datetime.now(),
+                            item=bucket_name,
+                            item_type="s3_bucket",
+                            passed=False,
+                            user=self.user_id,
+                            account_arn=self.account_arn,
+                            policy=bucket_policy
+                        )
+                        result.append(report)
                         issue_detected = True
             except botocore.exceptions.ClientError as ex:
                 if ex.response['Error']['Code'] == 'NoSuchBucketPolicy':
@@ -307,19 +377,24 @@ class Tester(interfaces.TesterInterface):
                     raise ex
 
             if not issue_detected:
-                result.append({
-                    "user": self.user_id,
-                    "account_arn": self.account_arn,
-                    "account": self.account_id,
-                    "timestamp": time.time(),
-                    "item": bucket_name,
-                    "item_type": "s3_bucket",
-                    "test_name": test_name,
-                    "test_result": "no_issue_found"})
+                report = TestReport(
+                    provider=self.declare_tested_provider(),
+                    service=self.declare_tested_service(),
+                    account=self.account_id,
+                    name=test_name,
+                    start_time=self.start_time,
+                    end_time=datetime.now(),
+                    item=bucket_name,
+                    item_type="s3_bucket",
+                    passed=True,
+                    user=self.user_id,
+                    account_arn=self.account_arn
+                )
+                result.append(report)
 
         return result
 
-    def detect_bucket_content_permissions_viewable_by_users(self, buckets_list):
+    def detect_bucket_content_permissions_viewable_by_users(self, buckets_list) -> List["TestReport"]:
         test_name = "s3_bucket_content_permissions_viewable_by_users"
         result = []
         for bucket_meta in buckets_list["Buckets"]:
@@ -330,17 +405,21 @@ class Tester(interfaces.TesterInterface):
                 policy_statements = json.loads(bucket_policy['Policy'])['Statement']
                 for statement in policy_statements:
                     if statement["Principal"] == '*' and "s3:GetObjectAcl" in statement["Action"] and str(statement["Resource"]).endswith('*'):
-                        result.append({
-                            "user": self.user_id,
-                            "account_arn": self.account_arn,
-                            "account": self.account_id,
-                            "timestamp": time.time(),
-                            "item": bucket_name,
-                            "item_type": "s3_bucket",
-                            "test_name": test_name,
-                            "policy": bucket_policy,
-                            "test_result": "issue_found"
-                        })
+                        report = TestReport(
+                            provider=self.declare_tested_provider(),
+                            service=self.declare_tested_service(),
+                            account=self.account_id,
+                            name=test_name,
+                            start_time=self.start_time,
+                            end_time=datetime.now(),
+                            item=bucket_name,
+                            item_type="s3_bucket",
+                            passed=False,
+                            user=self.user_id,
+                            account_arn=self.account_arn,
+                            policy=bucket_policy
+                        )
+                        result.append(report)
                         issue_detected = True
             except botocore.exceptions.ClientError as ex:
                 if ex.response['Error']['Code'] == 'NoSuchBucketPolicy':
@@ -350,19 +429,24 @@ class Tester(interfaces.TesterInterface):
                     raise ex
 
             if not issue_detected:
-                result.append({
-                    "user": self.user_id,
-                    "account_arn": self.account_arn,
-                    "account": self.account_id,
-                    "timestamp": time.time(),
-                    "item": bucket_name,
-                    "item_type": "s3_bucket",
-                    "test_name": test_name,
-                    "test_result": "no_issue_found"})
+                report = TestReport(
+                    provider=self.declare_tested_provider(),
+                    service=self.declare_tested_service(),
+                    account=self.account_id,
+                    name=test_name,
+                    start_time=self.start_time,
+                    end_time=datetime.now(),
+                    item=bucket_name,
+                    item_type="s3_bucket",
+                    passed=True,
+                    user=self.user_id,
+                    account_arn=self.account_arn
+                )
+                result.append(report)
 
         return result
 
-    def detect_bucket_content_permissions_modifiable_by_users(self, buckets_list):
+    def detect_bucket_content_permissions_modifiable_by_users(self, buckets_list) -> List["TestReport"]:
         test_name = "s3_bucket_content_permissions_modifiable_by_users"
         result = []
         for bucket_meta in buckets_list["Buckets"]:
@@ -373,17 +457,21 @@ class Tester(interfaces.TesterInterface):
                 policy_statements = json.loads(bucket_policy['Policy'])['Statement']
                 for statement in policy_statements:
                     if statement["Principal"] == '*' and "s3:PutObjectAcl" in statement["Action"] and str(statement["Resource"]).endswith('*'):
-                        result.append({
-                            "user": self.user_id,
-                            "account_arn": self.account_arn,
-                            "account": self.account_id,
-                            "timestamp": time.time(),
-                            "item": bucket_name,
-                            "item_type": "s3_bucket",
-                            "test_name": test_name,
-                            "policy": bucket_policy,
-                            "test_result": "issue_found"
-                        })
+                        report = TestReport(
+                            provider=self.declare_tested_provider(),
+                            service=self.declare_tested_service(),
+                            account=self.account_id,
+                            name=test_name,
+                            start_time=self.start_time,
+                            end_time=datetime.now(),
+                            item=bucket_name,
+                            item_type="s3_bucket",
+                            passed=False,
+                            user=self.user_id,
+                            account_arn=self.account_arn,
+                            policy=bucket_policy
+                        )
+                        result.append(report)
                         issue_detected = True
             except botocore.exceptions.ClientError as ex:
                 if ex.response['Error']['Code'] == 'NoSuchBucketPolicy':
@@ -393,19 +481,24 @@ class Tester(interfaces.TesterInterface):
                     raise ex
 
             if not issue_detected:
-                result.append({
-                    "user": self.user_id,
-                    "account_arn": self.account_arn,
-                    "account": self.account_id,
-                    "timestamp": time.time(),
-                    "item": bucket_name,
-                    "item_type": "s3_bucket",
-                    "test_name": test_name,
-                    "test_result": "no_issue_found"})
+                report = TestReport(
+                    provider=self.declare_tested_provider(),
+                    service=self.declare_tested_service(),
+                    account=self.account_id,
+                    name=test_name,
+                    start_time=self.start_time,
+                    end_time=datetime.now(),
+                    item=bucket_name,
+                    item_type="s3_bucket",
+                    passed=True,
+                    user=self.user_id,
+                    account_arn=self.account_arn
+                )
+                result.append(report)
 
         return result
 
-    def detect_bucket_content_writable_by_anonymous(self, buckets_list):
+    def detect_bucket_content_writable_by_anonymous(self, buckets_list) -> List["TestReport"]:
         test_name = "s3_bucket_content_writable_by_anonymous"
         result = []
         for bucket_meta in buckets_list["Buckets"]:
@@ -416,17 +509,21 @@ class Tester(interfaces.TesterInterface):
                 policy_statements = json.loads(bucket_policy['Policy'])['Statement']
                 for statement in policy_statements:
                     if statement["Principal"] == '*' and "s3:PutObject" in statement["Action"] and str(statement["Resource"]).endswith('*'):
-                        result.append({
-                            "user": self.user_id,
-                            "account_arn": self.account_arn,
-                            "account": self.account_id,
-                            "timestamp": time.time(),
-                            "item": bucket_name,
-                            "item_type": "s3_bucket",
-                            "test_name": test_name,
-                            "policy": bucket_policy,
-                            "test_result": "issue_found"
-                        })
+                        report = TestReport(
+                            provider=self.declare_tested_provider(),
+                            service=self.declare_tested_service(),
+                            account=self.account_id,
+                            name=test_name,
+                            start_time=self.start_time,
+                            end_time=datetime.now(),
+                            item=bucket_name,
+                            item_type="s3_bucket",
+                            passed=False,
+                            user=self.user_id,
+                            account_arn=self.account_arn,
+                            policy=bucket_policy
+                        )
+                        result.append(report)
                         issue_detected = True
             except botocore.exceptions.ClientError as ex:
                 if ex.response['Error']['Code'] == 'NoSuchBucketPolicy':
@@ -436,19 +533,24 @@ class Tester(interfaces.TesterInterface):
                     raise ex
 
             if not issue_detected:
-                result.append({
-                    "user": self.user_id,
-                    "account_arn": self.account_arn,
-                    "account": self.account_id,
-                    "timestamp": time.time(),
-                    "item": bucket_name,
-                    "item_type": "s3_bucket",
-                    "test_name": test_name,
-                    "test_result": "no_issue_found"})
+                report = TestReport(
+                        provider=self.declare_tested_provider(),
+                        service=self.declare_tested_service(),
+                        account=self.account_id,
+                        name=test_name,
+                        start_time=self.start_time,
+                        end_time=datetime.now(),
+                        item=bucket_name,
+                        item_type="s3_bucket",
+                        passed=True,
+                        user=self.user_id,
+                        account_arn=self.account_arn,
+                    )
+                result.append(report)
 
         return result
 
-    def detect_buckets_without_logging_set(self, buckets_list):
+    def detect_buckets_without_logging_set(self, buckets_list) -> List["TestReport"]:
         test_name = "no_logging_policy_set"
         result = []
         for bucket_meta in buckets_list["Buckets"]:
@@ -457,48 +559,57 @@ class Tester(interfaces.TesterInterface):
             try:
                 raw_logging_policy = self.aws_s3_resource.BucketLogging(bucket_name)
                 if not raw_logging_policy.logging_enabled:
-                    result.append({
-                        "user": self.user_id,
-                        "account_arn": self.account_arn,
-                        "account": self.account_id,
-                        "timestamp": time.time(),
-                        "item": bucket_name,
-                        "item_type": "s3_bucket",
-                        "test_name": test_name,
-                        "test_result": "issue_found"
-                    })
+                    report = TestReport(
+                        provider=self.declare_tested_provider(),
+                        service=self.declare_tested_service(),
+                        account=self.account_id,
+                        name=test_name,
+                        start_time=self.start_time,
+                        end_time=datetime.now(),
+                        item=bucket_name,
+                        item_type="s3_bucket",
+                        passed=False,
+                        user=self.user_id,
+                        account_arn=self.account_arn,
+                    )
+                    result.append(report)
                     issue_detected = True
             except botocore.exceptions.ClientError as ex:
                 raise ex
 
             if not issue_detected:
-                result.append({
-                    "user": self.user_id,
-                    "account_arn": self.account_arn,
-                    "account": self.account_id,
-                    "timestamp": time.time(),
-                    "item": bucket_name,
-                    "item_type": "s3_bucket",
-                    "test_name": test_name,
-                    "test_result": "no_issue_found"})
+                report = TestReport(
+                    provider=self.declare_tested_provider(),
+                    service=self.declare_tested_service(),
+                    account=self.account_id,
+                    name=test_name,
+                    start_time=self.start_time,
+                    end_time=datetime.now(),
+                    item=bucket_name,
+                    item_type="s3_bucket",
+                    passed=True,
+                    user=self.user_id,
+                    account_arn=self.account_arn,
+                )
+                result.append(report)
 
         return result
 
-    def detect_buckets_accessible_by_http_url(self, buckets_list):
+    def detect_buckets_accessible_by_http_url(self, buckets_list) -> List["TestReport"]:
         test_name = "publicly_accessible_s3_buckets_by_http_url"
         protocol = "http"
         result = self._test_bucket_url_access(buckets_list, protocol, test_name)
 
         return result
 
-    def detect_buckets_accessible_by_https_url(self, buckets_list):
+    def detect_buckets_accessible_by_https_url(self, buckets_list) -> List["TestReport"]:
         test_name = "publicly_accessible_s3_buckets_by_https_url"
         protocol = "https"
         result = self._test_bucket_url_access(buckets_list, protocol, test_name)
 
         return result
 
-    def _test_bucket_url_access(self, buckets_list, protocol, test_name):
+    def _test_bucket_url_access(self, buckets_list, protocol, test_name) -> List["TestReport"]:
         result = []
         for bucket_meta in buckets_list["Buckets"]:
             bucket_name = bucket_meta["Name"]
@@ -507,30 +618,40 @@ class Tester(interfaces.TesterInterface):
                 url = protocol + "://" + urllib.parse.quote_plus(bucket_name) + ".s3.amazonaws.com"
                 resp = requests.head(url)
                 if resp.status_code >= 200 and resp.status_code < 300:
-                    result.append({
-                        "user": self.user_id,
-                        "account_arn": self.account_arn,
-                        "account": self.account_id,
-                        "timestamp": time.time(),
-                        "item": bucket_name,
-                        "item_type": "s3_bucket",
-                        "test_name": test_name,
-                        "bucket_url": url,
-                        "test_result": "issue_found"
-                    })
+                    report = TestReport(
+                        provider=self.declare_tested_provider(),
+                        service=self.declare_tested_service(),
+                        account=self.account_id,
+                        name=test_name,
+                        start_time=self.start_time,
+                        end_time=datetime.now(),
+                        item=bucket_name,
+                        item_type="s3_bucket",
+                        passed=False,
+                        user=self.user_id,
+                        account_arn=self.account_arn,
+                        bucket_url=url
+                    )
+                    result.append(report)
                     issue_detected = True
             except:
                 continue
             if not issue_detected:
-                result.append({
-                    "user": self.user_id,
-                    "account_arn": self.account_arn,
-                    "account": self.account_id,
-                    "timestamp": time.time(),
-                    "item": bucket_name,
-                    "item_type": "s3_bucket",
-                    "test_name": test_name,
-                    "test_result": "no_issue_found"})
+                report = TestReport(
+                        provider=self.declare_tested_provider(),
+                        service=self.declare_tested_service(),
+                        account=self.account_id,
+                        name=test_name,
+                        start_time=self.start_time,
+                        end_time=datetime.now(),
+                        item=bucket_name,
+                        item_type="s3_bucket",
+                        passed=True,
+                        user=self.user_id,
+                        account_arn=self.account_arn,
+                        bucket_url=url
+                    )
+                result.append(report)
         return result
 
     def _get_bucket_policy(self, bucket_name):
@@ -566,27 +687,35 @@ class Tester(interfaces.TesterInterface):
                 if grantee["Permission"] == permission_to_check:
                     if bucket_name not in write_enabled_buckets:
                         write_enabled_buckets.append(bucket_name)
-                        result.append({
-                            "user": self.user_id,
-                            "account_arn": self.account_arn,
-                            "account": self.account_id,
-                            "timestamp": time.time(),
-                            "item": bucket_name,
-                            "item_type": "s3_bucket",
-                            "test_name": test_name,
-                            "permissions": cur_bucket_permissions.grants,
-                            "test_result": "issue_found"
-                        })
+                        report = TestReport(
+                            provider=self.declare_tested_provider(),
+                            service=self.declare_tested_service(),
+                            account=self.account_id,
+                            name=test_name,
+                            start_time=self.start_time,
+                            end_time=datetime.now(),
+                            item=bucket_name,
+                            item_type="s3_bucket",
+                            passed=False,
+                            user=self.user_id,
+                            account_arn=self.account_arn,
+                            permissions=cur_bucket_permissions.grants
+                        )
+                        result.append(report)
                         issue_detected = True
             if not issue_detected:
-                result.append({
-                    "user": self.user_id,
-                    "account_arn": self.account_arn,
-                    "account": self.account_id,
-                    "timestamp": time.time(),
-                    "item": bucket_name,
-                    "item_type": "s3_bucket",
-                    "test_name": test_name,
-                    "test_result": "no_issue_found"
-                })
+                report = TestReport(
+                    provider=self.declare_tested_provider(),
+                    service=self.declare_tested_service(),
+                    account=self.account_id,
+                    name=test_name,
+                    start_time=self.start_time,
+                    end_time=datetime.now(),
+                    item=bucket_name,
+                    item_type="s3_bucket",
+                    passed=True,
+                    user=self.user_id,
+                    account_arn=self.account_arn
+                )
+                result.append(report)
         return result
