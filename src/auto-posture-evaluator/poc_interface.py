@@ -6,7 +6,6 @@ from typing import List
 class TestReport(ABC):
     def __init__(self, provider: str,
                  service: str,
-                 account: str,
                  name: str,
                  start_time: datetime,
                  end_time: datetime,
@@ -16,7 +15,6 @@ class TestReport(ABC):
                  **kwargs):
         self.provider = provider
         self.service = service
-        self.account = account
         self.name = name
         self.start_time = start_time
         self.end_time = end_time

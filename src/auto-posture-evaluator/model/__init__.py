@@ -3,7 +3,7 @@
 # plugin: python-betterproto
 from dataclasses import dataclass
 from datetime import datetime
-from typing import List, Optional
+from typing import Dict, List, Optional
 
 import betterproto
 
@@ -59,7 +59,6 @@ class SecurityReportTestResult(betterproto.Message):
     additional_data: Optional[
         "betterproto_lib_google_protobuf.Struct"
     ] = betterproto.message_field(9, optional=True, group="_additional_data")
-    account: Optional[str] = betterproto.message_field(10, wraps=betterproto.TYPE_STRING)
 
 
 @dataclass(eq=False, repr=False)
@@ -76,9 +75,11 @@ class SecurityReportIngestionServiceStub(betterproto.ServiceStub):
     async def post_security_report(
             self, *, api_key: str, security_report: "SecurityReport" = None
     ) -> "PostSecurityReportResponse":
+
         request = PostSecurityReportRequest()
         if security_report is not None:
             request.security_report = security_report
+
         return await self._unary_unary(
             route="/com.coralogix.xdr.ingestion.v1.SecurityReportIngestionService/PostSecurityReport",
             request=request,

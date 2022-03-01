@@ -1,8 +1,8 @@
-proto_outdir = "./model"
+proto_outdir = "./temp"
 
 [[dependencies]]
   target = "github.com/coralogix/xc-api-xdr-ingestion/"
-  tag = "v0.0-RC1"
+  revision = "v0.0-RC1"
   branch = "feature/xdr-ingestion"
   protocol = "ssh"
 

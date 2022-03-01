@@ -26,7 +26,6 @@ def _to_model(report: TestReport) -> "SecurityReportTestResult":
     return SecurityReportTestResult(
         provider=report.provider,
         service=report.service,
-        account=report.account,
         name=report.name,
         start_time=report.start_time,
         end_time=report.end_time,
