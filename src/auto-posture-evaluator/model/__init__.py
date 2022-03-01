@@ -59,6 +59,9 @@ class SecurityReportTestResult(betterproto.Message):
     additional_data: Optional[
         "betterproto_lib_google_protobuf.Struct"
     ] = betterproto.message_field(9, optional=True, group="_additional_data")
+    execution_id: Optional[str] = betterproto.message_field(
+        10, wraps=betterproto.TYPE_STRING
+    )
 
 
 @dataclass(eq=False, repr=False)

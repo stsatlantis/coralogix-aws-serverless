@@ -4,7 +4,7 @@ all: proto_update generate clean_up
 
 proto_update:
 	mkdir -p temp
-	@protodep up
+	@protodep up --force
 
 generate:
 	@protoc -I ./temp --python_betterproto_out=temp  temp/com/coralogix/xdr/ingestion/v1/*

@@ -2,7 +2,7 @@ proto_outdir = "./temp"
 
 [[dependencies]]
   target = "github.com/coralogix/xc-api-xdr-ingestion/"
-  revision = "v0.0-RC1"
+  revision = "d153d2a1e45bac5fe7098abda6bb7e57860009af"
   branch = "feature/xdr-ingestion"
   protocol = "ssh"
 

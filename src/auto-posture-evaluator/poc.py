@@ -1,7 +1,9 @@
 import asyncio
+import datetime
 import importlib
 import os
 import sys
+import uuid
 from asyncio import AbstractEventLoop
 from typing import List
 
@@ -18,7 +20,7 @@ for module in testers_module_names:
 del module
 
 
-def _to_model(report: TestReport) -> "SecurityReportTestResult":
+def _to_model(report: TestReport, execution_id: uuid) -> "SecurityReportTestResult":
     additional_data = struct_from_dict(report.additional_data)
     result = SecurityReportTestResultResult.TEST_FAILED
     if report.passed:
@@ -32,6 +34,7 @@ def _to_model(report: TestReport) -> "SecurityReportTestResult":
         item=report.item,
         item_type=report.item_type,
         result=result,
+        execution_id=execution_id,
         additional_data=additional_data,
     )
 
@@ -56,7 +59,8 @@ class AutoPostureEvaluatorRunnable:
                 self.tests.append(sys.modules[tester_module].__dict__["Tester"])
 
     async def run_tests(self):
-        for i in range(0, len(self.tests)):
+        execution_id = datetime.date.today().isoformat() + "_" + str(uuid.uuid4())
+        for i in range(1, len(self.tests)):
             tester = self.tests[i]
             print("Starting: ", str(testers_module_names[i]))
             try:
@@ -76,7 +80,7 @@ class AutoPostureEvaluatorRunnable:
                 self.channel.close()
                 raise Exception(error_template + " (NotArray). CANNOT CONTINUE.")
             else:
-                results = list(map(_to_model, results))
+                results = list(map(lambda x: _to_model(x, execution_id), results))
                 report = SecurityReport(context=self.context, test_results=results)
                 try:
                     print("Sending requests", len(results))
