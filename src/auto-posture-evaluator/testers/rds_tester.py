@@ -36,7 +36,7 @@ class Tester(TesterInterface):
         return 'aws'
 
     def run_tests(self) -> List["TestReport"]:
-        self.start_time = datetime.now
+        self.start_time = datetime.now()
         return self.detect_rds_instance_encrypted() + \
                self.detect_rds_instance_not_publicly_accessible() + \
                self.detect_rds_instance_not_using_default_port() + \
@@ -83,6 +83,8 @@ class Tester(TesterInterface):
                 result.append(self._append_rds_test_result(rds, test_name, passed=False))
             else:
                 result.append(self._append_rds_test_result(rds, test_name, passed=True))
+            print("Checking rds", rds['DBInstanceIdentifier'], "for", test_name, " has_issue: ",
+                  not rds['StorageEncrypted'])
         return result
 
     def detect_rds_instance_not_publicly_accessible(self) -> List["TestReport"]:
@@ -93,6 +95,8 @@ class Tester(TesterInterface):
                 result.append(self._append_rds_test_result(rds, test_name, passed=False))
             else:
                 result.append(self._append_rds_test_result(rds, test_name, passed=True))
+            print("Checking rds", rds['DBInstanceIdentifier'], "for", test_name, " has_issue: ",
+                  rds['PubliclyAccessible'])
         return result
 
     def detect_rds_instance_not_using_default_port(self) -> List["TestReport"]:
@@ -104,6 +108,8 @@ class Tester(TesterInterface):
                 result.append(self._append_rds_test_result(rds, test_name, passed=False))
             else:
                 result.append(self._append_rds_test_result(rds, test_name, passed=True))
+            print("Checking rds", rds['DBInstanceIdentifier'], "for", test_name, " has_issue: ",
+                  rds['Endpoint']['Port'])
         return result
 
     def detect_rds_snapshot_not_publicly_accessible(self) -> List["TestReport"]:
@@ -118,4 +124,5 @@ class Tester(TesterInterface):
                     issue_found = True
             if not issue_found:
                 result.append(self._append_rds_snap_test_result(rds_snap, test_name, passed=True))
+            print("Checking rds", rds_snap['DBInstanceIdentifier'], "for", test_name, " has_issue: ", issue_found)
         return result

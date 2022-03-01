@@ -1,12 +1,12 @@
 import datetime
 import json
+import urllib.parse
 from datetime import datetime
 from typing import List
 
 import boto3
 import botocore.exceptions
 import requests
-import urllib.parse
 
 from poc_interface import TesterInterface, TestReport
 
@@ -61,7 +61,6 @@ class Tester(TesterInterface):
                 if grantee["Grantee"]["Type"] == "Group" and (
                         grantee["Grantee"]["URI"] == "http://acs.amazonaws.com/groups/global/AllUsers" or
                         grantee["Grantee"]["URI"] == "http://acs.amazonaws.com/groups/global/AuthenticatedUsers"):
-
                     report = TestReport(
                         provider=self.declare_tested_provider(),
                         service=self.declare_tested_service(),
@@ -93,6 +92,7 @@ class Tester(TesterInterface):
                     account_arn=self.account_arn
                 )
                 result.append(report)
+            print("Checking bucket for ", test_name, " has_issue: ", issue_detected, ":", bucket_name)
 
         return result
 
@@ -132,6 +132,7 @@ class Tester(TesterInterface):
                     account_arn=self.account_arn
                 )
                 result.append(report)
+            print("Checking bucket for ", test_name, " has_issue: ", cur_bucket_versioning.status, ":", bucket_name)
 
         return result
 
@@ -178,11 +179,13 @@ class Tester(TesterInterface):
                     account_arn=self.account_arn
                 )
                 result.append(report)
+            print("Checking bucket for ", test_name, " has_issue: ", issue_detected, ":", bucket_name)
 
         return result
 
     def detect_full_control_allowed_s3_buckets(self, buckets_list) -> List["TestReport"]:
-        return self._detect_buckets_with_permissions_matching(buckets_list, "FULL_CONTROL", "full_control_allowed_s3_buckets")
+        return self._detect_buckets_with_permissions_matching(buckets_list, "FULL_CONTROL",
+                                                              "full_control_allowed_s3_buckets")
 
     def detect_buckets_without_mfa_delete_s3_buckets(self, buckets_list) -> List["TestReport"]:
         test_name = "no_delete_mfa_s3_buckets"
@@ -220,6 +223,7 @@ class Tester(TesterInterface):
                     account_arn=self.account_arn
                 )
                 result.append(report)
+            print("Checking bucket for ", test_name, " has_issue: ", cur_bucket_versioning.mfa_delete, ":", bucket_name)
 
         return result
 
@@ -233,9 +237,9 @@ class Tester(TesterInterface):
                 public_access_block_kill_switch = self.aws_s3_client.get_public_access_block(Bucket=bucket_name)
                 access_block = public_access_block_kill_switch["PublicAccessBlockConfiguration"]
                 if not access_block["BlockPublicAcls"] or \
-                    not access_block["IgnorePublicAcls"] or \
-                    not access_block["BlockPublicPolicy"] or \
-                    not access_block["RestrictPublicBuckets"]:
+                        not access_block["IgnorePublicAcls"] or \
+                        not access_block["BlockPublicPolicy"] or \
+                        not access_block["RestrictPublicBuckets"]:
                     report = TestReport(
                         provider=self.declare_tested_provider(),
                         service=self.declare_tested_service(),
@@ -288,7 +292,7 @@ class Tester(TesterInterface):
                     account_arn=self.account_arn
                 )
                 result.append(report)
-
+            print("Checking bucket for ", test_name, " has_issue: ", issue_detected, ":", bucket_name)
         return result
 
     def detect_publicly_accessible_s3_buckets_by_policy(self, buckets_list) -> List["TestReport"]:
@@ -339,7 +343,7 @@ class Tester(TesterInterface):
                     account_arn=self.account_arn
                 )
                 result.append(report)
-
+            print("Checking bucket for ", test_name, " has_issue: ", issue_detected, ":", bucket_name)
         return result
 
     def detect_bucket_content_listable_by_users(self, buckets_list) -> List["TestReport"]:
@@ -391,7 +395,7 @@ class Tester(TesterInterface):
                     account_arn=self.account_arn
                 )
                 result.append(report)
-
+            print("Checking bucket for ", test_name, " has_issue: ", issue_detected, ":", bucket_name)
         return result
 
     def detect_bucket_content_permissions_viewable_by_users(self, buckets_list) -> List["TestReport"]:
@@ -404,7 +408,8 @@ class Tester(TesterInterface):
                 bucket_policy = self._get_bucket_policy(bucket_name)
                 policy_statements = json.loads(bucket_policy['Policy'])['Statement']
                 for statement in policy_statements:
-                    if statement["Principal"] == '*' and "s3:GetObjectAcl" in statement["Action"] and str(statement["Resource"]).endswith('*'):
+                    if statement["Principal"] == '*' and "s3:GetObjectAcl" in statement["Action"] and str(
+                            statement["Resource"]).endswith('*'):
                         report = TestReport(
                             provider=self.declare_tested_provider(),
                             service=self.declare_tested_service(),
@@ -443,6 +448,7 @@ class Tester(TesterInterface):
                     account_arn=self.account_arn
                 )
                 result.append(report)
+            print("Checking bucket for ", test_name, " has_issue: ", issue_detected, ":", bucket_name)
 
         return result
 
@@ -456,7 +462,8 @@ class Tester(TesterInterface):
                 bucket_policy = self._get_bucket_policy(bucket_name)
                 policy_statements = json.loads(bucket_policy['Policy'])['Statement']
                 for statement in policy_statements:
-                    if statement["Principal"] == '*' and "s3:PutObjectAcl" in statement["Action"] and str(statement["Resource"]).endswith('*'):
+                    if statement["Principal"] == '*' and "s3:PutObjectAcl" in statement["Action"] and str(
+                            statement["Resource"]).endswith('*'):
                         report = TestReport(
                             provider=self.declare_tested_provider(),
                             service=self.declare_tested_service(),
@@ -495,7 +502,7 @@ class Tester(TesterInterface):
                     account_arn=self.account_arn
                 )
                 result.append(report)
-
+            print("Checking bucket for ", test_name, " has_issue: ", issue_detected, ":", bucket_name)
         return result
 
     def detect_bucket_content_writable_by_anonymous(self, buckets_list) -> List["TestReport"]:
@@ -508,7 +515,8 @@ class Tester(TesterInterface):
                 bucket_policy = self._get_bucket_policy(bucket_name)
                 policy_statements = json.loads(bucket_policy['Policy'])['Statement']
                 for statement in policy_statements:
-                    if statement["Principal"] == '*' and "s3:PutObject" in statement["Action"] and str(statement["Resource"]).endswith('*'):
+                    if statement["Principal"] == '*' and "s3:PutObject" in statement["Action"] and str(
+                            statement["Resource"]).endswith('*'):
                         report = TestReport(
                             provider=self.declare_tested_provider(),
                             service=self.declare_tested_service(),
@@ -534,19 +542,20 @@ class Tester(TesterInterface):
 
             if not issue_detected:
                 report = TestReport(
-                        provider=self.declare_tested_provider(),
-                        service=self.declare_tested_service(),
-                        account=self.account_id,
-                        name=test_name,
-                        start_time=self.start_time,
-                        end_time=datetime.now(),
-                        item=bucket_name,
-                        item_type="s3_bucket",
-                        passed=True,
-                        user=self.user_id,
-                        account_arn=self.account_arn,
-                    )
+                    provider=self.declare_tested_provider(),
+                    service=self.declare_tested_service(),
+                    account=self.account_id,
+                    name=test_name,
+                    start_time=self.start_time,
+                    end_time=datetime.now(),
+                    item=bucket_name,
+                    item_type="s3_bucket",
+                    passed=True,
+                    user=self.user_id,
+                    account_arn=self.account_arn,
+                )
                 result.append(report)
+            print("Checking bucket for ", test_name, " has_issue: ", issue_detected, ":", bucket_name)
 
         return result
 
@@ -592,7 +601,7 @@ class Tester(TesterInterface):
                     account_arn=self.account_arn,
                 )
                 result.append(report)
-
+            print("Checking bucket for ", test_name, " has_issue: ", issue_detected, ":", bucket_name)
         return result
 
     def detect_buckets_accessible_by_http_url(self, buckets_list) -> List["TestReport"]:
@@ -638,20 +647,21 @@ class Tester(TesterInterface):
                 continue
             if not issue_detected:
                 report = TestReport(
-                        provider=self.declare_tested_provider(),
-                        service=self.declare_tested_service(),
-                        account=self.account_id,
-                        name=test_name,
-                        start_time=self.start_time,
-                        end_time=datetime.now(),
-                        item=bucket_name,
-                        item_type="s3_bucket",
-                        passed=True,
-                        user=self.user_id,
-                        account_arn=self.account_arn,
-                        bucket_url=url
-                    )
+                    provider=self.declare_tested_provider(),
+                    service=self.declare_tested_service(),
+                    account=self.account_id,
+                    name=test_name,
+                    start_time=self.start_time,
+                    end_time=datetime.now(),
+                    item=bucket_name,
+                    item_type="s3_bucket",
+                    passed=True,
+                    user=self.user_id,
+                    account_arn=self.account_arn,
+                    bucket_url=url
+                )
                 result.append(report)
+            print("Checking bucket for ", test_name, " has_issue: ", issue_detected, ":", bucket_name)
         return result
 
     def _get_bucket_policy(self, bucket_name):
@@ -718,4 +728,6 @@ class Tester(TesterInterface):
                     account_arn=self.account_arn
                 )
                 result.append(report)
+            print("Checking bucket for ", permission_to_check, " under ", test_name, " has_issue: ", bucket_name,
+                  ":", issue_detected)
         return result

@@ -3,6 +3,7 @@ from typing import Dict, Any
 
 from betterproto.lib.google.protobuf import Struct, Value, NullValue, ListValue
 
+
 def struct_from_dict(d: Dict[str, Any]) -> "Struct":
 
     def create_value(value) -> "Value":

@@ -12,7 +12,7 @@ from model import SecurityReportTestResult, SecurityReportIngestionServiceStub, 
 from model.helper import struct_from_dict
 from poc_interface import TestReport, TesterInterface
 
-testers_module_names = ['testers.example_tester', 'testers.s3_tester', 'testers.rds_tester']
+testers_module_names = ['testers.s3_tester', 'testers.rds_tester']
 for module in testers_module_names:
     importlib.import_module(module)
 del module
@@ -58,6 +58,7 @@ class AutoPostureEvaluatorRunnable:
     async def run_tests(self):
         for i in range(0, len(self.tests)):
             tester = self.tests[i]
+            print("Starting: ", str(testers_module_names[i]))
             try:
                 cur_tester = tester()
                 results = cur_tester.run_tests()
@@ -80,8 +81,10 @@ class AutoPostureEvaluatorRunnable:
                 try:
                     print("Sending requests", len(results))
                     await self.client.post_security_report(api_key=self.api_key, security_report=report)
-                finally:
-                    self.channel.close()
+                except Exception as ex:
+                    print("Sending requests failed", ex)
+                    continue
+        self.channel.close()
         pass
 
 
