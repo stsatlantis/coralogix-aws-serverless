@@ -59,7 +59,7 @@ class AutoPostureEvaluatorRunnable:
                 self.tests.append(sys.modules[tester_module].__dict__["Tester"])
 
     async def run_tests(self):
-        execution_id = datetime.date.today().isoformat() + "_" + str(uuid.uuid4())
+        execution_id = str(uuid.uuid4())
         for i in range(1, len(self.tests)):
             tester = self.tests[i]
             print("Starting: ", str(testers_module_names[i]))
