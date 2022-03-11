@@ -1,5 +1,4 @@
 import asyncio
-import datetime
 import importlib
 import os
 import sys
@@ -60,7 +59,7 @@ class AutoPostureEvaluatorRunnable:
 
     async def run_tests(self):
         execution_id = str(uuid.uuid4())
-        for i in range(1, len(self.tests)):
+        for i in range(0, len(self.tests)):
             tester = self.tests[i]
             print("Starting: ", str(testers_module_names[i]))
             try:

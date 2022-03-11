@@ -19,8 +19,8 @@ class Tester(TesterInterface):
         self.user_id = boto3.client('sts').get_caller_identity().get('UserId')
         self.account_arn = boto3.client('sts').get_caller_identity().get('Arn')
         self.account_id = boto3.client('sts').get_caller_identity().get('Account')
-        self.s3_buckets = boto3.client('s3').list_buckets()
         self.start_time = None
+        self.s3_buckets = None
 
     def declare_tested_service(self) -> str:
         return 's3'
@@ -29,6 +29,7 @@ class Tester(TesterInterface):
         return 'aws'
 
     def run_tests(self) -> List["TestReport"]:
+        self.s3_buckets = boto3.client('s3').list_buckets()
         self.start_time = datetime.now()
         return \
             self.detect_write_enabled_buckets(self.s3_buckets) + \
