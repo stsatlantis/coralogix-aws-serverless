@@ -11,7 +11,6 @@ from model import SecurityReportTestResult, SecurityReportIngestionServiceStub, 
     SecurityReportTestResultResult
 from model.helper import struct_from_dict
 
-
 testers_module_names = []
 for module in os.listdir(os.path.dirname(__file__) + '/testers'):
     if module.startswith('_') or module[-3:] != '.py':
@@ -48,7 +47,7 @@ def _to_model(log_message, execution_id, provider, service, start_time, end_time
         result=test_result,
         execution_id=execution_id,
         additional_data=struct_from_dict(additional_data)
-)
+    )
 
 
 class AutoPostureEvaluator:
@@ -61,7 +60,7 @@ class AutoPostureEvaluator:
         port = os.environ.get("CORALOGIX_ENDPOINT_PORT", "443")
         self.channel = Channel(host=endpoint, port=int(port), ssl=True)
         self.client = SecurityReportIngestionServiceStub(channel=self.channel)
-        self.api_key = os.environ.get('API_KEY')
+        self.api_key = os.environ.get('PRIVATE_KEY')
         self.private_key = os.environ.get('PRIVATE_KEY')
         self.context = SecurityReportContext(
             private_key=self.private_key,
@@ -83,10 +82,13 @@ class AutoPostureEvaluator:
                 tester_result = cur_tester.run_tests()
                 cur_test_end_timestamp = datetime.datetime.now()
             except Exception as exTesterException:
-                print("WARN: The tester " + str(testers_module_names[i]) + " has crashed with the following exception during 'run_tests()'. SKIPPED: " + str(exTesterException))
+                print("WARN: The tester " + str(testers_module_names[i]) +
+                      " has crashed with the following exception during 'run_tests()'. SKIPPED: " +
+                      str(exTesterException))
                 continue
 
-            error_template = "The result object from the tester " + cur_tester.declare_tested_service() + " does not match the required standard"
+            error_template = "The result object from the tester " + cur_tester.declare_tested_service() + \
+                             " does not match the required standard"
             if tester_result is None:
                 print(error_template + " (ResultIsNone).")
                 continue
@@ -96,9 +98,15 @@ class AutoPostureEvaluator:
             if len(tester_result) == 0:
                 print(error_template + " (Empty list).")
                 continue
+            if not tester_result:
+                print(error_template + " (NoResults). NO POINT OF CONTINUE")
+                continue
             else:
                 for result_obj in tester_result:
-                    if "timestamp" not in result_obj or "item" not in result_obj or "item_type" not in result_obj or "test_result" not in result_obj:
+                    if "timestamp" not in result_obj or \
+                            "item" not in result_obj or \
+                            "item_type" not in result_obj or \
+                            "test_result" not in result_obj:
                         print(error_template + " (FieldsMissing). CANNOT CONTINUE.")
                         continue
                     if result_obj["item"] is None:
@@ -110,19 +118,19 @@ class AutoPostureEvaluator:
                     if len(str(int(result_obj["timestamp"]))) != 10:
                         print(error_template + " (ItemDateIsNotTenDigitsIntPart). CANNOT CONTINUE.")
                         continue
-            try:
 
-                security_report_test_result_list = list(map(lambda x: _to_model(x,
-                                                                                execution_id,
-                                                                                cur_tester.declare_tested_provider(),
-                                                                                cur_tester.declare_tested_service(),
-                                                                                cur_test_start_timestamp,
-                                                                                cur_test_end_timestamp), tester_result))
-                report = SecurityReport(context=self.context, test_results=security_report_test_result_list)
-                print("DEBUG: Sent " + str(len(security_report_test_result_list)) + " events for " + str(testers_module_names[i]))
+            security_report_test_result_list = list(map(lambda x: _to_model(x,
+                                                                            execution_id,
+                                                                            cur_tester.declare_tested_provider(),
+                                                                            cur_tester.declare_tested_service(),
+                                                                            cur_test_start_timestamp,
+                                                                            cur_test_end_timestamp), tester_result))
+            report = SecurityReport(context=self.context, test_results=security_report_test_result_list)
+            print("DEBUG: Sent " + str(len(security_report_test_result_list)) + " events for " + str(
+                testers_module_names[i]))
+            try:
                 loop: AbstractEventLoop = asyncio.get_event_loop()
-                loop.run_until_complete(
-                    self.client.post_security_report(api_key=self.api_key, security_report=report))
+                loop.run_until_complete(self.client.post_security_report(api_key=self.api_key, security_report=report))
             except Exception as ex:
                 print("ERROR: Failed to send " + str(len(security_report_test_result_list)) + " for tester " +
                       str(testers_module_names[i]) + " events due to the following exception: " + str(ex))
