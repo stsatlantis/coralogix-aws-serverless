@@ -60,7 +60,6 @@ class AutoPostureEvaluator:
         port = os.environ.get("CORALOGIX_ENDPOINT_PORT", "443")
         self.channel = Channel(host=endpoint, port=int(port), ssl=True)
         self.client = SecurityReportIngestionServiceStub(channel=self.channel)
-        self.api_key = os.environ.get('PRIVATE_KEY')
         self.private_key = os.environ.get('PRIVATE_KEY')
         self.context = SecurityReportContext(
             private_key=self.private_key,
@@ -130,7 +129,7 @@ class AutoPostureEvaluator:
                 testers_module_names[i]))
             try:
                 loop: AbstractEventLoop = asyncio.get_event_loop()
-                loop.run_until_complete(self.client.post_security_report(api_key=self.api_key, security_report=report))
+                loop.run_until_complete(self.client.post_security_report(api_key=self.private_key, security_report=report))
             except Exception as ex:
                 print("ERROR: Failed to send " + str(len(security_report_test_result_list)) + " for tester " +
                       str(testers_module_names[i]) + " events due to the following exception: " + str(ex))
