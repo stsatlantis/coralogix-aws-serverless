@@ -76,6 +76,7 @@ class AutoPostureEvaluator:
         for i in range(0, len(self.tests)):
             cur_test_start_timestamp = datetime.datetime.now()
             tester = self.tests[i]
+            print("Executing", tester)
             try:
                 cur_tester = tester()
                 tester_result = cur_tester.run_tests()
@@ -89,16 +90,10 @@ class AutoPostureEvaluator:
             error_template = "The result object from the tester " + cur_tester.declare_tested_service() + \
                              " does not match the required standard"
             if tester_result is None:
-                print(error_template + " (ResultIsNone).")
+                print(error_template, "(ResultIsNone).")
                 continue
             if not isinstance(tester_result, list):
-                print(error_template + " (NotArray).")
-                continue
-            if len(tester_result) == 0:
-                print(error_template + " (Empty list).")
-                continue
-            if not tester_result:
-                print(error_template + " (NoResults). NO POINT OF CONTINUE")
+                print(error_template, "(NotArray)")
                 continue
             else:
                 for result_obj in tester_result:
@@ -106,16 +101,16 @@ class AutoPostureEvaluator:
                             "item" not in result_obj or \
                             "item_type" not in result_obj or \
                             "test_result" not in result_obj:
-                        print(error_template + " (FieldsMissing). CANNOT CONTINUE.")
+                        print(error_template, "(FieldsMissing). CANNOT CONTINUE.")
                         continue
                     if result_obj["item"] is None:
-                        print(error_template + " (ItemIsNone). CANNOT CONTINUE.")
+                        print(error_template, "(ItemIsNone). CANNOT CONTINUE.")
                         continue
                     if not isinstance(result_obj["timestamp"], float):
-                        print(error_template + " (ItemDateIsNotFloat). CANNOT CONTINUE.")
+                        print(error_template, "(ItemDateIsNotFloat). CANNOT CONTINUE.")
                         continue
                     if len(str(int(result_obj["timestamp"]))) != 10:
-                        print(error_template + " (ItemDateIsNotTenDigitsIntPart). CANNOT CONTINUE.")
+                        print(error_template, "(ItemDateIsNotTenDigitsIntPart). CANNOT CONTINUE.")
                         continue
 
             security_report_test_result_list = list(map(lambda x: _to_model(x,
@@ -125,11 +120,14 @@ class AutoPostureEvaluator:
                                                                             cur_test_start_timestamp,
                                                                             cur_test_end_timestamp), tester_result))
             report = SecurityReport(context=self.context, test_results=security_report_test_result_list)
-            print("DEBUG: Sent " + str(len(security_report_test_result_list)) + " events for " + str(
-                testers_module_names[i]))
+            print("DEBUG: Sent", str(len(security_report_test_result_list)), "events for ",
+                  str(testers_module_names[i]))
+            if not tester_result:
+                continue
             try:
                 loop: AbstractEventLoop = asyncio.get_event_loop()
-                loop.run_until_complete(self.client.post_security_report(api_key=self.private_key, security_report=report))
+                loop.run_until_complete(
+                    self.client.post_security_report(api_key=self.private_key, security_report=report))
             except Exception as ex:
                 print("ERROR: Failed to send " + str(len(security_report_test_result_list)) + " for tester " +
                       str(testers_module_names[i]) + " events due to the following exception: " + str(ex))
