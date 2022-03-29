@@ -76,7 +76,7 @@ class AutoPostureEvaluator:
         for i in range(0, len(self.tests)):
             cur_test_start_timestamp = datetime.datetime.now()
             tester = self.tests[i]
-            print("Executing", tester)
+            print("Executing", testers_module_names[i])
             try:
                 cur_tester = tester()
                 tester_result = cur_tester.run_tests()
