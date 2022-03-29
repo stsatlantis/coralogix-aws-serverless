@@ -63,7 +63,7 @@ class AutoPostureEvaluator:
         self.private_key = os.environ.get('PRIVATE_KEY')
         self.context = SecurityReportContext(
             private_key=self.private_key,
-            application_name=os.environ.get('APPLICATION_NAME', 'NO_APP_NAME'),
+            application_name='test-autoposture',
             subsystem_name=os.environ.get('SUBSYSTEM_NAME', 'NO_SUB_NAME'),
             computer_name="CoralogixServerlessLambda")
         self.tests = []
